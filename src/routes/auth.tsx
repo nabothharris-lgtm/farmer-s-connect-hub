@@ -282,20 +282,61 @@ function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto flex max-w-md flex-col items-center px-4 py-6">
-        <div className="mb-2 w-full">
-          <BackButton to="/" label="Back to home" />
+    <div className="min-h-screen bg-background lg:grid lg:grid-cols-2">
+      {/* Aside - Left Side */}
+      <div className="hidden flex-col justify-between bg-primary p-10 text-primary-foreground lg:flex">
+        <div>
+          <Link to="/" className="mb-8 flex items-center gap-2">
+            <div className="flex h-10 w-10 overflow-hidden rounded-lg bg-white/10 p-1">
+              <img src="/favicon.ico" alt="AgriConnect Logo" className="h-full w-full object-contain" />
+            </div>
+            <span className="text-xl font-bold">AgriConnect</span>
+          </Link>
+          <h1 className="mt-12 text-4xl font-bold leading-tight">
+            Grow more, with the right people beside you.
+          </h1>
+          <p className="mt-6 max-w-md text-lg text-primary-foreground/80">
+            Join thousands of Ugandan farmers, verified experts, and agro-stores building a stronger, more transparent agricultural ecosystem.
+          </p>
         </div>
 
-        <Link to="/" className="mb-6 flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Sprout className="h-5 w-5" />
+        <div className="mt-auto space-y-6 pb-12">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10">
+              <ShieldCheck className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <div className="font-semibold text-lg">Verified Ecosystem</div>
+              <div className="text-sm text-primary-foreground/80">Every expert and store is thoroughly vetted.</div>
+            </div>
           </div>
-          <span className="text-lg font-semibold">AgriConnect</span>
-        </Link>
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10">
+              <MapPin className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <div className="font-semibold text-lg">Local Focus</div>
+              <div className="text-sm text-primary-foreground/80">Find partners right in your district.</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        <Card className="w-full p-6">
+      {/* Auth Form - Right Side */}
+      <div className="flex flex-col px-4 py-6 lg:h-screen lg:overflow-y-auto lg:p-12">
+        <div className="mx-auto w-full max-w-md">
+          <div className="mb-6 w-full">
+            <BackButton to="/" label="Back to home" />
+          </div>
+
+          <Link to="/" className="mb-6 flex items-center gap-2 lg:hidden">
+            <div className="flex h-10 w-10 overflow-hidden rounded-lg bg-primary/10 p-1">
+              <img src="/favicon.ico" alt="AgriConnect Logo" className="h-full w-full object-contain" />
+            </div>
+            <span className="text-xl font-bold text-foreground">AgriConnect</span>
+          </Link>
+
+          <Card className="w-full p-6">
           <Tabs defaultValue="signup">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signup">Create account</TabsTrigger>
@@ -481,6 +522,7 @@ function AuthPage() {
             </TabsContent>
           </Tabs>
         </Card>
+        </div>
       </div>
 
       {/* Admin secret-code modal */}
