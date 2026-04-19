@@ -119,14 +119,21 @@ function AuthPage() {
       if (roleErr) throw roleErr;
 
       // 4. Update profile
-      const profileUpdate: Record<string, unknown> = { full_name: fullName, phone };
+      const profileUpdate: {
+        full_name: string;
+        phone: string;
+        location_lat?: number;
+        location_lng?: number;
+        farmer_specialty?: FarmerSpecialty;
+        referred_by_agent?: string;
+        verification_status?: "unsubmitted" | "pending" | "approved" | "rejected";
+      } = { full_name: fullName, phone };
       if (coords) {
         profileUpdate.location_lat = coords.lat;
         profileUpdate.location_lng = coords.lng;
       }
       if (role === "farmer" && specialty) profileUpdate.farmer_specialty = specialty;
       if (referringAgentId) profileUpdate.referred_by_agent = referringAgentId;
-      // Mark experts/stores as 'pending' if they uploaded any docs
       const hasAnyDoc = !!(docs.national_id || docs.license || docs.certificate);
       if ((role === "expert" || role === "store") && hasAnyDoc) {
         profileUpdate.verification_status = "pending";
