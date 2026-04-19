@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Sprout, MapPin, Calendar, Wallet, Star, Users, Store, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -24,6 +25,28 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = "https://cdn.landbot.io/landbot-3/landbot-3.0.0.mjs";
+    script.async = true;
+    script.onload = () => {
+      if ((window as any).Landbot) {
+        new (window as any).Landbot.Container({
+          container: '#myLandbot',
+          configUrl: 'https://storage.googleapis.com/landbot.site/v3/H-3403186-8VO3OFLGCJSR5TUV/index.json',
+        });
+      }
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Top bar */}
@@ -189,6 +212,11 @@ function Landing() {
             </Button>
           </div>
         </div>
+      </section>
+
+      {/* Landbot Container */}
+      <section className="mx-auto max-w-6xl px-4 pb-24">
+        <div id="myLandbot" style={{ width: "100%", height: "600px" }}></div>
       </section>
 
       <footer className="border-t border-border/60 py-8 text-center text-sm text-muted-foreground">
