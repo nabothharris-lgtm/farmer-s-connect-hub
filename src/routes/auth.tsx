@@ -7,8 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import type { AppRole } from "@/lib/auth";
+
+type FarmerSpecialty = "poultry" | "crops" | "dairy" | "fish" | "mixed" | "other";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -38,6 +41,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [specialty, setSpecialty] = useState<FarmerSpecialty | "">("");
 
   // login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -81,18 +85,19 @@ function AuthPage() {
         .insert({ user_id: data.user.id, role });
       if (roleErr) throw roleErr;
 
-      // Update profile location
+      // Update profile (location, name, phone, optional farmer specialty)
+      const profileUpdate: Record<string, unknown> = {
+        full_name: fullName,
+        phone,
+      };
       if (coords) {
-        await supabase
-          .from("profiles")
-          .update({
-            location_lat: coords.lat,
-            location_lng: coords.lng,
-            full_name: fullName,
-            phone,
-          })
-          .eq("id", data.user.id);
+        profileUpdate.location_lat = coords.lat;
+        profileUpdate.location_lng = coords.lng;
       }
+      if (role === "farmer" && specialty) {
+        profileUpdate.farmer_specialty = specialty;
+      }
+      await supabase.from("profiles").update(profileUpdate).eq("id", data.user.id);
 
       // If expert, seed expert_profiles row
       if (role === "expert") {
@@ -181,6 +186,22 @@ function AuthPage() {
                   <Label htmlFor="phone">Phone</Label>
                   <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
                 </div>
+                {role === "farmer" && (
+                  <div>
+                    <Label>What do you farm? <span className="text-xs text-muted-foreground">(optional — unlocks the marketplace)</span></Label>
+                    <Select value={specialty} onValueChange={(v) => setSpecialty(v as FarmerSpecialty)}>
+                      <SelectTrigger><SelectValue placeholder="Select your main produce" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="poultry">Poultry (eggs, chicken)</SelectItem>
+                        <SelectItem value="crops">Crops (maize, beans, coffee...)</SelectItem>
+                        <SelectItem value="dairy">Dairy (milk, cheese)</SelectItem>
+                        <SelectItem value="fish">Fish / aquaculture</SelectItem>
+                        <SelectItem value="mixed">Mixed farm</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
