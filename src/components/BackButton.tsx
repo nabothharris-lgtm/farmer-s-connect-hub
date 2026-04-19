@@ -15,21 +15,19 @@ interface Props {
 export function BackButton({ to, label = "Back", className }: Props) {
   const router = useRouter();
 
-  const handle = () => {
+  const handle = (e: React.MouseEvent) => {
     // history.length > 1 means we have something to go back to inside the SPA
     if (typeof window !== "undefined" && window.history.length > 1) {
+      e.preventDefault();
       router.history.back();
-    } else if (to) {
-      router.navigate({ to });
-    } else {
-      router.navigate({ to: "/" });
     }
+    // If no history, it naturally falls back to the `to` prop of the Link
   };
 
-  if (to && (typeof window === "undefined" || window.history.length <= 1)) {
+  if (to) {
     return (
       <Button asChild variant="ghost" size="sm" className={className}>
-        <Link to={to}>
+        <Link to={to} onClick={handle}>
           <ArrowLeft className="mr-1 h-4 w-4" /> {label}
         </Link>
       </Button>
@@ -37,7 +35,18 @@ export function BackButton({ to, label = "Back", className }: Props) {
   }
 
   return (
-    <Button variant="ghost" size="sm" className={className} onClick={handle}>
+    <Button
+      variant="ghost"
+      size="sm"
+      className={className}
+      onClick={() => {
+        if (typeof window !== "undefined" && window.history.length > 1) {
+          router.history.back();
+        } else {
+          router.navigate({ to: "/" });
+        }
+      }}
+    >
       <ArrowLeft className="mr-1 h-4 w-4" /> {label}
     </Button>
   );
