@@ -1,4 +1,4 @@
-import { useRouter, Link } from "@tanstack/react-router";
+import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -13,13 +13,13 @@ interface Props {
  * Avoids full page reload — pure client-side navigation.
  */
 export function BackButton({ to, label = "Back", className }: Props) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const handle = (e: React.MouseEvent) => {
     // history.length > 1 means we have something to go back to inside the SPA
     if (typeof window !== "undefined" && window.history.length > 1) {
       e.preventDefault();
-      router.history.back();
+      navigate(-1);
     }
     // If no history, it naturally falls back to the `to` prop of the Link
   };
@@ -41,9 +41,9 @@ export function BackButton({ to, label = "Back", className }: Props) {
       className={className}
       onClick={() => {
         if (typeof window !== "undefined" && window.history.length > 1) {
-          router.history.back();
+          navigate(-1);
         } else {
-          router.navigate({ to: "/" });
+          navigate("/");
         }
       }}
     >
