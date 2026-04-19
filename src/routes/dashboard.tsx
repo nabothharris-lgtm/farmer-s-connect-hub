@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, MapPin, Calendar, Star, Users, Store, Wallet, ArrowRight } from "lucide-react";
+import { Loader2, MapPin, Calendar, Star, Users, Store, Wallet, ArrowRight, Crown, Sparkles, Package, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserAndRole, type AppRole, distanceKm } from "@/lib/auth";
+import { shouldShowProUpsell, type SubscriptionTier, TRIAL_DAYS } from "@/lib/subscription";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,10 @@ interface Profile {
   full_name: string | null;
   location_lat: number | null;
   location_lng: number | null;
+  subscription_tier: SubscriptionTier;
+  pro_since: string | null;
+  created_at: string;
+  farmer_specialty: string | null;
 }
 
 function DashboardPage() {
