@@ -1,4 +1,4 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
 
@@ -25,54 +25,6 @@ function NotFoundComponent() {
 }
 
 export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Agriconnect" },
-      { name: "description", content: "This is agriconnect" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Agriconnect" },
-      { property: "og:description", content: "This is agriconnect" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Agriconnect" },
-      { name: "twitter:description", content: "This is agriconnect" },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/6XjYJ0gnsKYQr0AZnYg8f1sUmsx2/social-images/social-1776595765328-favicon.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/6XjYJ0gnsKYQr0AZnYg8f1sUmsx2/social-images/social-1776595765328-favicon.webp" },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-      {
-        rel: "icon",
-        type: "image/x-icon",
-        href: "/favicon.ico",
-      },
-    ],
-  }),
-  shellComponent: RootShell,
-  component: RootComponent,
+  component: () => <Outlet />,
   notFoundComponent: NotFoundComponent,
 });
-
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
-
-function RootComponent() {
-  return <Outlet />;
-}
