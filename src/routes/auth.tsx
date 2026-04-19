@@ -86,7 +86,13 @@ function AuthPage() {
       if (roleErr) throw roleErr;
 
       // Update profile (location, name, phone, optional farmer specialty)
-      const profileUpdate: Record<string, unknown> = {
+      const profileUpdate: {
+        full_name: string;
+        phone: string;
+        location_lat?: number;
+        location_lng?: number;
+        farmer_specialty?: FarmerSpecialty;
+      } = {
         full_name: fullName,
         phone,
       };
