@@ -1,13 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { Sprout, Crown } from "lucide-react";
+import { Sprout, Crown, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut, type AppRole } from "@/lib/auth";
 import type { SubscriptionTier } from "@/lib/subscription";
+import { NotificationBell } from "@/components/NotificationBell";
 
 interface Props {
   role: AppRole | null;
   email?: string | null;
   tier?: SubscriptionTier;
+  userId?: string | null;
 }
 
 const roleLabel: Record<AppRole, string> = {
@@ -18,7 +20,7 @@ const roleLabel: Record<AppRole, string> = {
   admin: "Admin",
 };
 
-export function AppHeader({ role, email, tier }: Props) {
+export function AppHeader({ role, email, tier, userId }: Props) {
   return (
     <header className="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-30">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
@@ -43,6 +45,13 @@ export function AppHeader({ role, email, tier }: Props) {
             <Button asChild variant="ghost" size="sm">
               <Link to="/pricing" activeProps={{ className: "bg-secondary" }}>Pricing</Link>
             </Button>
+            {role === "admin" && (
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/admin" activeProps={{ className: "bg-secondary" }}>
+                  <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Admin
+                </Link>
+              </Button>
+            )}
           </nav>
         )}
 
@@ -60,6 +69,7 @@ export function AppHeader({ role, email, tier }: Props) {
           {email && (
             <span className="hidden text-xs text-muted-foreground lg:inline">{email}</span>
           )}
+          {userId && <NotificationBell userId={userId} />}
           {email ? (
             <Button variant="outline" size="sm" onClick={signOut}>
               Sign out
@@ -84,6 +94,11 @@ export function AppHeader({ role, email, tier }: Props) {
           <Button asChild variant="ghost" size="sm">
             <Link to="/pricing">Pricing</Link>
           </Button>
+          {role === "admin" && (
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/admin">Admin</Link>
+            </Button>
+          )}
         </nav>
       )}
     </header>

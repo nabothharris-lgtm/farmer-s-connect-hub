@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Sprout, MapPin, Loader2 } from "lucide-react";
+import { Sprout, MapPin, Loader2, ShieldCheck, Sparkles, Upload, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,13 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { BackButton } from "@/components/BackButton";
+import { verifyAdminSecret, seedDemoData } from "@/server/admin";
 import type { AppRole } from "@/lib/auth";
 
 type FarmerSpecialty = "poultry" | "crops" | "dairy" | "fish" | "mixed" | "other";
+type FarmerSignupMode = "direct" | "agent";
+type DocType = "national_id" | "license" | "certificate";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -24,15 +28,19 @@ export const Route = createFileRoute("/auth")({
 });
 
 const roles: { value: AppRole; label: string; desc: string }[] = [
-  { value: "farmer", label: "Farmer", desc: "I grow crops or livestock" },
-  { value: "expert", label: "Expert", desc: "I provide farm services" },
-  { value: "store", label: "Agro Store", desc: "I sell farm inputs" },
-  { value: "agent", label: "Field Agent", desc: "I onboard farmers" },
+  { value: "farmer", label: "Farmer",     desc: "I grow crops or livestock" },
+  { value: "expert", label: "Expert",     desc: "I provide farm services" },
+  { value: "store",  label: "Agro Store", desc: "I sell farm inputs" },
+  { value: "agent",  label: "Field Agent",desc: "I onboard farmers" },
 ];
 
 function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [adminCodeOpen, setAdminCodeOpen] = useState(false);
+  const [adminCode, setAdminCode] = useState("");
+  const [adminPendingUserId, setAdminPendingUserId] = useState<string | null>(null);
 
   // signup state
   const [fullName, setFullName] = useState("");
@@ -42,6 +50,17 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [specialty, setSpecialty] = useState<FarmerSpecialty | "">("");
+
+  // Farmer-specific
+  const [farmerMode, setFarmerMode] = useState<FarmerSignupMode>("direct");
+  const [agentCode, setAgentCode] = useState("");
+
+  // Expert / store docs (collected after signup, uploaded to storage)
+  const [docs, setDocs] = useState<Record<DocType, File | null>>({
+    national_id: null,
+    license: null,
+    certificate: null,
+  });
 
   // login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -67,7 +86,20 @@ function AuthPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    let referringAgentId: string | null = null;
+
     try {
+      // 1. Validate agent code BEFORE creating the account
+      if (role === "farmer" && farmerMode === "agent") {
+        const code = agentCode.trim().toUpperCase();
+        if (!code) throw new Error("Please enter the field agent's ID");
+        const { data: match, error: rpcErr } = await supabase.rpc("find_agent_by_code", { _code: code });
+        if (rpcErr) throw rpcErr;
+        if (!match || match.length === 0) throw new Error("Agent ID not found. Please double-check with your field agent.");
+        referringAgentId = match[0].agent_id;
+      }
+
+      // 2. Create the user
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -78,43 +110,88 @@ function AuthPage() {
       });
       if (error) throw error;
       if (!data.user) throw new Error("Signup failed");
+      const newUserId = data.user.id;
 
-      // Insert role
+      // 3. Insert role
       const { error: roleErr } = await supabase
         .from("user_roles")
-        .insert({ user_id: data.user.id, role });
+        .insert({ user_id: newUserId, role });
       if (roleErr) throw roleErr;
 
-      // Update profile (location, name, phone, optional farmer specialty)
+      // 4. Update profile
       const profileUpdate: {
         full_name: string;
         phone: string;
         location_lat?: number;
         location_lng?: number;
         farmer_specialty?: FarmerSpecialty;
-      } = {
-        full_name: fullName,
-        phone,
-      };
+        referred_by_agent?: string;
+        verification_status?: "unsubmitted" | "pending" | "approved" | "rejected";
+      } = { full_name: fullName, phone };
       if (coords) {
         profileUpdate.location_lat = coords.lat;
         profileUpdate.location_lng = coords.lng;
       }
-      if (role === "farmer" && specialty) {
-        profileUpdate.farmer_specialty = specialty;
+      if (role === "farmer" && specialty) profileUpdate.farmer_specialty = specialty;
+      if (referringAgentId) profileUpdate.referred_by_agent = referringAgentId;
+      const hasAnyDoc = !!(docs.national_id || docs.license || docs.certificate);
+      if ((role === "expert" || role === "store") && hasAnyDoc) {
+        profileUpdate.verification_status = "pending";
       }
-      await supabase.from("profiles").update(profileUpdate).eq("id", data.user.id);
+      await supabase.from("profiles").update(profileUpdate).eq("id", newUserId);
 
-      // If expert, seed expert_profiles row
+      // 5. Expert seed
       if (role === "expert") {
         await supabase.from("expert_profiles").insert({
-          id: data.user.id,
+          id: newUserId,
           specialty: "General agronomy",
           bio: "",
           hourly_rate: 0,
           years_experience: 0,
         });
       }
+
+      // 6. Upload verification docs (expert/store)
+      if (role === "expert" || role === "store") {
+        for (const [k, file] of Object.entries(docs) as Array<[DocType, File | null]>) {
+          if (!file) continue;
+          const path = `${newUserId}/${k}-${Date.now()}-${file.name}`;
+          const { error: upErr } = await supabase.storage.from("verification-docs").upload(path, file);
+          if (upErr) {
+            toast.error(`Could not upload ${k}: ${upErr.message}`);
+            continue;
+          }
+          await supabase.from("verification_documents").insert({
+            user_id: newUserId,
+            doc_type: k,
+            file_url: path,
+          });
+        }
+      }
+
+      // 7. Agent commission for signup-via-agent
+      if (referringAgentId) {
+        await supabase.from("agent_earnings").insert({
+          agent_id: referringAgentId,
+          farmer_id: newUserId,
+          source: "signup",
+          amount: 5000,
+        });
+        // notify the agent (the agent may not be logged in — RLS now allows admin or the user themselves;
+        // we are signed in as the new farmer, so we can only insert notif for ourselves. Skip notifying agent here;
+        // agent's earning row will surface in their dashboard.)
+      }
+
+      // Welcome notification for the new user
+      await supabase.from("notifications").insert({
+        user_id: newUserId,
+        kind: "system",
+        title: `Welcome to AgriConnect, ${fullName.split(" ")[0]}!`,
+        body:
+          role === "expert" || role === "store"
+            ? "Your account is created. Verification documents are under review."
+            : "You're all set. Explore experts, marketplace, and more.",
+      });
 
       toast.success("Account created");
       navigate({ to: "/dashboard" });
@@ -130,11 +207,26 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password: loginPassword,
       });
       if (error) throw error;
+      if (!data.user) throw new Error("Login failed");
+
+      // Check if admin — if yes, require secret code before dashboard
+      const { data: roleRows } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id);
+      const isAdmin = (roleRows ?? []).some((r) => r.role === "admin");
+      if (isAdmin) {
+        setAdminPendingUserId(data.user.id);
+        setAdminCodeOpen(true);
+        setLoading(false);
+        return;
+      }
+
       navigate({ to: "/dashboard" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Login failed";
@@ -144,9 +236,58 @@ function AuthPage() {
     }
   };
 
+  const submitAdminCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await verifyAdminSecret({ data: { code: adminCode.trim() } });
+      if (!res.ok) {
+        toast.error("Invalid admin secret code");
+        // sign them out so a wrong code doesn't grant admin session
+        await supabase.auth.signOut();
+        setAdminPendingUserId(null);
+        setAdminCodeOpen(false);
+        setAdminCode("");
+        return;
+      }
+      navigate({ to: "/admin" });
+    } catch {
+      toast.error("Could not verify code");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const seedDemos = async () => {
+    setSeeding(true);
+    try {
+      const res = await seedDemoData();
+      if (!res.ok) throw new Error(res.error ?? "Seed failed");
+      toast.success("Demo accounts ready");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not seed demo data");
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const useDemo = async (key: "farmer" | "expert" | "store" | "agent" | "admin") => {
+    setLoginEmail(`demo.${key}@agriconnect.ug`);
+    setLoginPassword("Demo1234!");
+    // small delay so the inputs reflect the value before submitting
+    setTimeout(() => {
+      const ev = new Event("submit", { bubbles: true, cancelable: true });
+      document.getElementById("login-form")?.dispatchEvent(ev);
+    }, 50);
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto flex max-w-md flex-col items-center px-4 py-10">
+      <div className="mx-auto flex max-w-md flex-col items-center px-4 py-6">
+        <div className="mb-2 w-full">
+          <BackButton to="/" label="Back to home" />
+        </div>
+
         <Link to="/" className="mb-6 flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Sprout className="h-5 w-5" />
@@ -184,6 +325,52 @@ function AuthPage() {
                   </div>
                 </div>
 
+                {/* Farmer: direct vs via agent */}
+                {role === "farmer" && (
+                  <div className="rounded-lg border border-border p-3">
+                    <Label className="mb-2 block text-xs">How did you hear about us?</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFarmerMode("direct")}
+                        className={`rounded-md border p-2 text-xs transition ${
+                          farmerMode === "direct"
+                            ? "border-primary bg-primary/5 font-semibold"
+                            : "border-border"
+                        }`}
+                      >
+                        Direct sign-up
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFarmerMode("agent")}
+                        className={`rounded-md border p-2 text-xs transition ${
+                          farmerMode === "agent"
+                            ? "border-primary bg-primary/5 font-semibold"
+                            : "border-border"
+                        }`}
+                      >
+                        Via field agent
+                      </button>
+                    </div>
+                    {farmerMode === "agent" && (
+                      <div className="mt-3">
+                        <Label htmlFor="agent">Field agent ID</Label>
+                        <Input
+                          id="agent"
+                          placeholder="e.g. AG-A1B2C3"
+                          value={agentCode}
+                          onChange={(e) => setAgentCode(e.target.value.toUpperCase())}
+                          required
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Ask your field agent for their ID. They earn commission on your activity.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <Label htmlFor="name">Full name</Label>
                   <Input id="name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
@@ -192,9 +379,10 @@ function AuthPage() {
                   <Label htmlFor="phone">Phone</Label>
                   <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
                 </div>
+
                 {role === "farmer" && (
                   <div>
-                    <Label>What do you farm? <span className="text-xs text-muted-foreground">(optional — unlocks the marketplace)</span></Label>
+                    <Label>What do you farm? <span className="text-xs text-muted-foreground">(optional)</span></Label>
                     <Select value={specialty} onValueChange={(v) => setSpecialty(v as FarmerSpecialty)}>
                       <SelectTrigger><SelectValue placeholder="Select your main produce" /></SelectTrigger>
                       <SelectContent>
@@ -208,6 +396,29 @@ function AuthPage() {
                     </Select>
                   </div>
                 )}
+
+                {(role === "expert" || role === "store") && (
+                  <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <ShieldCheck className="h-4 w-4 text-primary" />
+                      Verification documents
+                    </div>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      Upload your ID and {role === "store" ? "trading licence" : "professional licence"} so admins can verify you. You can use the app immediately — your "Verified" badge appears once approved.
+                    </p>
+                    <DocPicker label="National ID" value={docs.national_id} onChange={(f) => setDocs((d) => ({ ...d, national_id: f }))} />
+                    <DocPicker label={role === "store" ? "Trading licence" : "Professional licence"} value={docs.license} onChange={(f) => setDocs((d) => ({ ...d, license: f }))} />
+                    <DocPicker label="Certificate (optional)" value={docs.certificate} onChange={(f) => setDocs((d) => ({ ...d, certificate: f }))} />
+                  </div>
+                )}
+
+                {role === "agent" && (
+                  <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3 text-xs text-muted-foreground">
+                    <Sparkles className="mr-1 inline h-3 w-3 text-accent" />
+                    You'll receive your unique <span className="font-semibold text-foreground">Agent ID</span> right after signup. Share it with farmers to earn commission on every transaction.
+                  </div>
+                )}
+
                 <div>
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -230,7 +441,7 @@ function AuthPage() {
             </TabsContent>
 
             <TabsContent value="login" className="mt-5">
-              <form onSubmit={handleLogin} className="space-y-3">
+              <form id="login-form" onSubmit={handleLogin} className="space-y-3">
                 <div>
                   <Label htmlFor="lemail">Email</Label>
                   <Input id="lemail" type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
@@ -244,10 +455,112 @@ function AuthPage() {
                   Sign in
                 </Button>
               </form>
+
+              {/* Demo accounts */}
+              <div className="mt-6 rounded-lg border border-dashed border-border p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold">Try a demo account</div>
+                  <Button type="button" size="sm" variant="ghost" onClick={seedDemos} disabled={seeding}>
+                    {seeding ? <Loader2 className="h-3 w-3 animate-spin" /> : "Seed demos"}
+                  </Button>
+                </div>
+                <p className="mt-1 mb-2 text-[11px] text-muted-foreground">
+                  Click "Seed demos" once, then log in instantly as any role.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["farmer","expert","store","agent","admin"] as const).map((k) => (
+                    <Button key={k} type="button" size="sm" variant="outline" onClick={() => useDemo(k)}>
+                      {k.charAt(0).toUpperCase() + k.slice(1)}
+                    </Button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[10px] text-muted-foreground">
+                  Admins also need the secret code (you set it earlier in Cloud Secrets).
+                </p>
+              </div>
             </TabsContent>
           </Tabs>
         </Card>
       </div>
+
+      {/* Admin secret-code modal */}
+      {adminCodeOpen && adminPendingUserId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className="w-full max-w-sm p-6">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                <div className="font-semibold">Admin verification</div>
+              </div>
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  setAdminCodeOpen(false);
+                  setAdminCode("");
+                  setAdminPendingUserId(null);
+                }}
+                className="rounded-full p-1 text-muted-foreground hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Enter the admin secret code to access the admin panel.
+            </p>
+            <form onSubmit={submitAdminCode} className="space-y-3">
+              <Input
+                type="password"
+                placeholder="Admin secret code"
+                value={adminCode}
+                onChange={(e) => setAdminCode(e.target.value)}
+                autoFocus
+                required
+              />
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Verify & enter
+              </Button>
+            </form>
+          </Card>
+        </div>
+      )}
     </div>
+  );
+}
+
+function DocPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: File | null;
+  onChange: (f: File | null) => void;
+}) {
+  return (
+    <label className="mt-2 flex cursor-pointer items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs hover:border-primary/50">
+      <div className="flex items-center gap-2 truncate">
+        <Upload className="h-3.5 w-3.5 text-primary" />
+        <span className="truncate">{value ? value.name : label}</span>
+      </div>
+      {value && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            onChange(null);
+          }}
+          className="rounded-full p-0.5 text-muted-foreground hover:bg-muted"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      <input
+        type="file"
+        accept="image/*,application/pdf"
+        className="hidden"
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+      />
+    </label>
   );
 }

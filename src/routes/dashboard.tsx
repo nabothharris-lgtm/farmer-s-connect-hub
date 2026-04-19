@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, MapPin, Calendar, Star, Users, Store, Wallet, ArrowRight, Crown, Sparkles, Package, X } from "lucide-react";
+import { Loader2, MapPin, Calendar, Star, Users, Store, Wallet, ArrowRight, Crown, Sparkles, Package, X, Trophy, Copy, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserAndRole, type AppRole, distanceKm } from "@/lib/auth";
 import { shouldShowProUpsell, type SubscriptionTier, TRIAL_DAYS } from "@/lib/subscription";
@@ -26,6 +26,9 @@ interface Profile {
   pro_since: string | null;
   created_at: string;
   farmer_specialty: string | null;
+  agent_code: string | null;
+  verified: boolean;
+  verification_status: string;
 }
 
 function DashboardPage() {
@@ -33,6 +36,7 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
@@ -43,10 +47,11 @@ function DashboardPage() {
         return;
       }
       setEmail(user.email ?? null);
+      setUserId(user.id);
       setRole(role);
       const { data: prof } = await supabase
         .from("profiles")
-        .select("id, full_name, location_lat, location_lng, subscription_tier, pro_since, created_at, farmer_specialty")
+        .select("id, full_name, location_lat, location_lng, subscription_tier, pro_since, created_at, farmer_specialty, agent_code, verified, verification_status")
         .eq("id", user.id)
         .maybeSingle();
       setProfile(prof as Profile | null);
@@ -64,7 +69,7 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader role={role} email={email} tier={profile?.subscription_tier} />
+      <AppHeader role={role} email={email} tier={profile?.subscription_tier} userId={userId} />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -75,25 +80,76 @@ function DashboardPage() {
               {role === "farmer" && "Find experts, list produce, and grow your farm."}
               {role === "expert" && "Manage incoming bookings and your profile."}
               {role === "store" && "Manage your products and incoming orders (coming soon)."}
-              {role === "agent" && "Onboard farmers and earn commission (coming soon)."}
+              {role === "agent" && "Onboard farmers and earn commission on every transaction."}
+              {role === "admin" && "Use the admin panel to verify users and oversee the platform."}
               {!role && "Your role isn't set yet."}
             </p>
           </div>
-          {profile?.subscription_tier === "pro" && (
-            <Badge className="bg-primary text-primary-foreground">
-              <Crown className="mr-1 h-3 w-3" /> Pro member
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {profile?.verified && (
+              <Badge className="bg-primary text-primary-foreground">
+                <ShieldCheck className="mr-1 h-3 w-3" /> Verified
+              </Badge>
+            )}
+            {profile?.subscription_tier === "pro" && (
+              <Badge className="bg-primary text-primary-foreground">
+                <Crown className="mr-1 h-3 w-3" /> Pro member
+              </Badge>
+            )}
+          </div>
         </div>
 
+        <VerificationBanner profile={profile} role={role} />
         <ProUpsellBanner profile={profile} />
 
         {role === "farmer" && <FarmerView profile={profile} />}
         {role === "expert" && <ExpertView />}
         {role === "store" && <ComingSoonView icon={Store} title="Store dashboard" />}
-        {role === "agent" && <ComingSoonView icon={Users} title="Agent dashboard" />}
+        {role === "agent" && profile && <AgentView profile={profile} />}
+        {role === "admin" && <AdminQuickView />}
       </main>
     </div>
+  );
+}
+
+function VerificationBanner({ profile, role }: { profile: Profile | null; role: AppRole | null }) {
+  if (!profile || (role !== "expert" && role !== "store")) return null;
+  if (profile.verification_status === "approved") return null;
+  const map = {
+    unsubmitted: { tone: "border-accent/40 bg-accent/5", title: "Add your documents to get verified", body: "Upload your national ID and licence so admins can mark your account as Verified." },
+    pending:     { tone: "border-primary/40 bg-primary/5", title: "Verification under review", body: "Admins are checking your documents. The Verified badge will appear once approved." },
+    rejected:    { tone: "border-destructive/40 bg-destructive/5", title: "Verification rejected", body: "Please re-upload clearer documents from your profile." },
+  } as const;
+  const cfg = map[profile.verification_status as keyof typeof map] ?? map.unsubmitted;
+  return (
+    <Card className={`mb-6 p-4 ${cfg.tone}`}>
+      <div className="flex items-start gap-3">
+        <ShieldCheck className="mt-0.5 h-5 w-5 text-primary" />
+        <div>
+          <div className="font-semibold">{cfg.title}</div>
+          <p className="text-sm text-muted-foreground">{cfg.body}</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function AdminQuickView() {
+  return (
+    <Card className="p-6">
+      <div className="flex items-start gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <ShieldCheck className="h-6 w-6" />
+        </div>
+        <div className="flex-1">
+          <h2 className="text-lg font-semibold">Admin tools</h2>
+          <p className="text-sm text-muted-foreground">Verify experts and stores, monitor users, manage the platform.</p>
+          <Button asChild className="mt-3">
+            <Link to="/admin">Open admin panel <ArrowRight className="ml-1 h-3 w-3" /></Link>
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -496,5 +552,177 @@ function ComingSoonView({ icon: Icon, title }: { icon: any; title: string }) {
         feature workflows ship in the next iteration.
       </p>
     </Card>
+  );
+}
+
+/* ========== AGENT ========== */
+
+interface AgentEarning {
+  id: string;
+  source: string;
+  amount: number;
+  created_at: string;
+  farmer_id: string;
+}
+
+interface LeaderRow {
+  agent_id: string;
+  total: number;
+  count: number;
+  name: string | null;
+  agent_code: string | null;
+}
+
+function AgentView({ profile }: { profile: Profile }) {
+  const [earnings, setEarnings] = useState<AgentEarning[]>([]);
+  const [referrals, setReferrals] = useState<{ id: string; full_name: string | null; created_at: string }[]>([]);
+  const [leaders, setLeaders] = useState<LeaderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    const [{ data: e }, { data: r }, { data: allEarn }, { data: profs }] = await Promise.all([
+      supabase.from("agent_earnings").select("id, source, amount, created_at, farmer_id").eq("agent_id", profile.id).order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, full_name, created_at").eq("referred_by_agent", profile.id).order("created_at", { ascending: false }),
+      supabase.from("agent_earnings").select("agent_id, amount"),
+      supabase.from("profiles").select("id, full_name, agent_code").not("agent_code", "is", null),
+    ]);
+    setEarnings((e as AgentEarning[]) ?? []);
+    setReferrals((r as { id: string; full_name: string | null; created_at: string }[]) ?? []);
+
+    // Build leaderboard
+    const totals = new Map<string, { total: number; count: number }>();
+    (allEarn ?? []).forEach((row) => {
+      const cur = totals.get(row.agent_id) ?? { total: 0, count: 0 };
+      cur.total += Number(row.amount);
+      cur.count += 1;
+      totals.set(row.agent_id, cur);
+    });
+    const profMap = new Map((profs ?? []).map((p) => [p.id, p]));
+    const board: LeaderRow[] = [...totals.entries()]
+      .map(([agent_id, t]) => ({
+        agent_id,
+        total: t.total,
+        count: t.count,
+        name: profMap.get(agent_id)?.full_name ?? "Agent",
+        agent_code: profMap.get(agent_id)?.agent_code ?? null,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+    setLeaders(board);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.id]);
+
+  const totalEarned = earnings.reduce((sum, e) => sum + Number(e.amount), 0);
+  const myRank = leaders.findIndex((l) => l.agent_id === profile.id) + 1;
+
+  const copyCode = () => {
+    if (!profile.agent_code) return;
+    navigator.clipboard.writeText(profile.agent_code);
+    toast.success("Agent ID copied");
+  };
+
+  if (loading) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
+
+  return (
+    <div className="space-y-6">
+      {/* Agent ID card */}
+      <Card className="relative overflow-hidden p-5">
+        <div
+          className="pointer-events-none absolute inset-0 -z-0 opacity-30"
+          style={{ background: "radial-gradient(60% 80% at 100% 0%, var(--primary-glow) 0%, transparent 60%)" }}
+        />
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Your Agent ID</div>
+            <div className="font-mono text-3xl font-bold tracking-tight">{profile.agent_code ?? "—"}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Share with farmers to earn commission on every transaction.</p>
+          </div>
+          <Button onClick={copyCode} variant="outline" size="sm">
+            <Copy className="mr-1 h-3 w-3" /> Copy ID
+          </Button>
+        </div>
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Stat label="Total earned (UGX)" value={totalEarned.toLocaleString()} icon={Wallet} />
+        <Stat label="Transactions" value={earnings.length} icon={ArrowRight} />
+        <Stat label="Farmers referred" value={referrals.length} icon={Users} />
+        <Stat label="Leaderboard rank" value={myRank > 0 ? `#${myRank}` : "—"} icon={Trophy} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section>
+          <h2 className="mb-3 text-lg font-semibold flex items-center gap-2"><Trophy className="h-5 w-5 text-accent" /> Top agents</h2>
+          {leaders.length === 0 ? (
+            <Card className="p-5 text-sm text-muted-foreground">No earnings recorded yet.</Card>
+          ) : (
+            <Card className="divide-y divide-border">
+              {leaders.map((l, i) => {
+                const isMe = l.agent_id === profile.id;
+                return (
+                  <div key={l.agent_id} className={`flex items-center justify-between p-3 ${isMe ? "bg-primary/5" : ""}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                        i === 0 ? "bg-yellow-400/20 text-yellow-700 dark:text-yellow-400" :
+                        i === 1 ? "bg-zinc-300/30 text-zinc-700 dark:text-zinc-200" :
+                        i === 2 ? "bg-orange-400/20 text-orange-700 dark:text-orange-400" :
+                        "bg-muted text-muted-foreground"
+                      }`}>{i + 1}</div>
+                      <div>
+                        <div className="text-sm font-semibold">{l.name} {isMe && <span className="text-xs text-primary">(you)</span>}</div>
+                        <div className="text-[11px] font-mono text-muted-foreground">{l.agent_code}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-semibold">UGX {l.total.toLocaleString()}</div>
+                      <div className="text-[11px] text-muted-foreground">{l.count} txn</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Recent earnings</h2>
+          {earnings.length === 0 ? (
+            <Card className="p-5 text-sm text-muted-foreground">No earnings yet. Share your Agent ID with farmers to start earning.</Card>
+          ) : (
+            <Card className="divide-y divide-border">
+              {earnings.slice(0, 8).map((e) => (
+                <div key={e.id} className="flex items-center justify-between p-3 text-sm">
+                  <div>
+                    <div className="font-medium capitalize">{e.source} commission</div>
+                    <div className="text-[11px] text-muted-foreground">{new Date(e.created_at).toLocaleString()}</div>
+                  </div>
+                  <div className="font-semibold text-primary">+ UGX {Number(e.amount).toLocaleString()}</div>
+                </div>
+              ))}
+            </Card>
+          )}
+
+          <h2 className="mb-3 mt-6 text-lg font-semibold">My farmers</h2>
+          {referrals.length === 0 ? (
+            <Card className="p-5 text-sm text-muted-foreground">No referred farmers yet.</Card>
+          ) : (
+            <Card className="divide-y divide-border">
+              {referrals.map((r) => (
+                <div key={r.id} className="flex items-center justify-between p-3 text-sm">
+                  <div className="font-medium">{r.full_name ?? "Farmer"}</div>
+                  <div className="text-[11px] text-muted-foreground">Joined {new Date(r.created_at).toLocaleDateString()}</div>
+                </div>
+              ))}
+            </Card>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
