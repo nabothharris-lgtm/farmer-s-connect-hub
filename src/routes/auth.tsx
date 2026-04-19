@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { BackButton } from "@/components/BackButton";
-import { verifyAdminSecret, seedDemoData } from "@/server/admin";
+import { verifyAdminSecret } from "@/server/admin";
 import type { AppRole } from "@/lib/auth";
 
 type FarmerSpecialty = "poultry" | "crops" | "dairy" | "fish" | "mixed" | "other";
@@ -37,7 +37,6 @@ const roles: { value: AppRole; label: string; desc: string }[] = [
 function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [seeding, setSeeding] = useState(false);
   const [adminCodeOpen, setAdminCodeOpen] = useState(false);
   const [adminCode, setAdminCode] = useState("");
   const [adminPendingUserId, setAdminPendingUserId] = useState<string | null>(null);
@@ -258,28 +257,6 @@ function AuthPage() {
     }
   };
 
-  const seedDemos = async () => {
-    setSeeding(true);
-    try {
-      const res = await seedDemoData();
-      if (!res.ok) throw new Error(res.error ?? "Seed failed");
-      toast.success("Demo accounts ready");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not seed demo data");
-    } finally {
-      setSeeding(false);
-    }
-  };
-
-  const useDemo = async (key: "farmer" | "expert" | "store" | "agent" | "admin") => {
-    setLoginEmail(`demo.${key}@agriconnect.ug`);
-    setLoginPassword("Demo1234!");
-    // small delay so the inputs reflect the value before submitting
-    setTimeout(() => {
-      const ev = new Event("submit", { bubbles: true, cancelable: true });
-      document.getElementById("login-form")?.dispatchEvent(ev);
-    }, 50);
-  };
 
   return (
     <div className="min-h-screen bg-background lg:grid lg:grid-cols-2">
@@ -497,28 +474,6 @@ function AuthPage() {
                 </Button>
               </form>
 
-              {/* Demo accounts */}
-              <div className="mt-6 rounded-lg border border-dashed border-border p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-semibold">Try a demo account</div>
-                  <Button type="button" size="sm" variant="ghost" onClick={seedDemos} disabled={seeding}>
-                    {seeding ? <Loader2 className="h-3 w-3 animate-spin" /> : "Seed demos"}
-                  </Button>
-                </div>
-                <p className="mt-1 mb-2 text-[11px] text-muted-foreground">
-                  Click "Seed demos" once, then log in instantly as any role.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["farmer","expert","store","agent","admin"] as const).map((k) => (
-                    <Button key={k} type="button" size="sm" variant="outline" onClick={() => useDemo(k)}>
-                      {k.charAt(0).toUpperCase() + k.slice(1)}
-                    </Button>
-                  ))}
-                </div>
-                <p className="mt-2 text-[10px] text-muted-foreground">
-                  Admins also need the secret code (you set it earlier in Cloud Secrets).
-                </p>
-              </div>
             </TabsContent>
           </Tabs>
         </Card>
