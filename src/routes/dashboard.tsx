@@ -254,7 +254,12 @@ function FarmerView({ profile }: { profile: Profile | null }) {
             <Card className="p-5 text-sm text-muted-foreground">No experts yet.</Card>
           )}
           {experts.map((e) => (
-            <Card key={e.id} className="p-4">
+            <Card key={e.id} className={`relative p-4 ${e.tier === "pro" ? "border-primary/40 ring-1 ring-primary/20" : ""}`}>
+              {e.tier === "pro" && (
+                <Badge className="absolute right-3 top-3 bg-primary text-primary-foreground text-[10px]">
+                  <Sparkles className="mr-0.5 h-2.5 w-2.5" /> Sponsored
+                </Badge>
+              )}
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
                   {(e.full_name ?? "E")[0]}
