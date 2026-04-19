@@ -36,6 +36,7 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
@@ -46,10 +47,11 @@ function DashboardPage() {
         return;
       }
       setEmail(user.email ?? null);
+      setUserId(user.id);
       setRole(role);
       const { data: prof } = await supabase
         .from("profiles")
-        .select("id, full_name, location_lat, location_lng, subscription_tier, pro_since, created_at, farmer_specialty")
+        .select("id, full_name, location_lat, location_lng, subscription_tier, pro_since, created_at, farmer_specialty, agent_code, verified, verification_status")
         .eq("id", user.id)
         .maybeSingle();
       setProfile(prof as Profile | null);
@@ -67,7 +69,7 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader role={role} email={email} tier={profile?.subscription_tier} />
+      <AppHeader role={role} email={email} tier={profile?.subscription_tier} userId={userId} />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -78,25 +80,76 @@ function DashboardPage() {
               {role === "farmer" && "Find experts, list produce, and grow your farm."}
               {role === "expert" && "Manage incoming bookings and your profile."}
               {role === "store" && "Manage your products and incoming orders (coming soon)."}
-              {role === "agent" && "Onboard farmers and earn commission (coming soon)."}
+              {role === "agent" && "Onboard farmers and earn commission on every transaction."}
+              {role === "admin" && "Use the admin panel to verify users and oversee the platform."}
               {!role && "Your role isn't set yet."}
             </p>
           </div>
-          {profile?.subscription_tier === "pro" && (
-            <Badge className="bg-primary text-primary-foreground">
-              <Crown className="mr-1 h-3 w-3" /> Pro member
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {profile?.verified && (
+              <Badge className="bg-primary text-primary-foreground">
+                <ShieldCheck className="mr-1 h-3 w-3" /> Verified
+              </Badge>
+            )}
+            {profile?.subscription_tier === "pro" && (
+              <Badge className="bg-primary text-primary-foreground">
+                <Crown className="mr-1 h-3 w-3" /> Pro member
+              </Badge>
+            )}
+          </div>
         </div>
 
+        <VerificationBanner profile={profile} role={role} />
         <ProUpsellBanner profile={profile} />
 
         {role === "farmer" && <FarmerView profile={profile} />}
         {role === "expert" && <ExpertView />}
         {role === "store" && <ComingSoonView icon={Store} title="Store dashboard" />}
-        {role === "agent" && <ComingSoonView icon={Users} title="Agent dashboard" />}
+        {role === "agent" && profile && <AgentView profile={profile} />}
+        {role === "admin" && <AdminQuickView />}
       </main>
     </div>
+  );
+}
+
+function VerificationBanner({ profile, role }: { profile: Profile | null; role: AppRole | null }) {
+  if (!profile || (role !== "expert" && role !== "store")) return null;
+  if (profile.verification_status === "approved") return null;
+  const map = {
+    unsubmitted: { tone: "border-accent/40 bg-accent/5", title: "Add your documents to get verified", body: "Upload your national ID and licence so admins can mark your account as Verified." },
+    pending:     { tone: "border-primary/40 bg-primary/5", title: "Verification under review", body: "Admins are checking your documents. The Verified badge will appear once approved." },
+    rejected:    { tone: "border-destructive/40 bg-destructive/5", title: "Verification rejected", body: "Please re-upload clearer documents from your profile." },
+  } as const;
+  const cfg = map[profile.verification_status as keyof typeof map] ?? map.unsubmitted;
+  return (
+    <Card className={`mb-6 p-4 ${cfg.tone}`}>
+      <div className="flex items-start gap-3">
+        <ShieldCheck className="mt-0.5 h-5 w-5 text-primary" />
+        <div>
+          <div className="font-semibold">{cfg.title}</div>
+          <p className="text-sm text-muted-foreground">{cfg.body}</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function AdminQuickView() {
+  return (
+    <Card className="p-6">
+      <div className="flex items-start gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <ShieldCheck className="h-6 w-6" />
+        </div>
+        <div className="flex-1">
+          <h2 className="text-lg font-semibold">Admin tools</h2>
+          <p className="text-sm text-muted-foreground">Verify experts and stores, monitor users, manage the platform.</p>
+          <Button asChild className="mt-3">
+            <Link to="/admin">Open admin panel <ArrowRight className="ml-1 h-3 w-3" /></Link>
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
