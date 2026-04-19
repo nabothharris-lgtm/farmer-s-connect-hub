@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_earnings: {
+        Row: {
+          agent_id: string
+          amount: number
+          created_at: string
+          farmer_id: string
+          id: string
+          reference_id: string | null
+          source: string
+        }
+        Insert: {
+          agent_id: string
+          amount?: number
+          created_at?: string
+          farmer_id: string
+          id?: string
+          reference_id?: string | null
+          source: string
+        }
+        Update: {
+          agent_id?: string
+          amount?: number
+          created_at?: string
+          farmer_id?: string
+          id?: string
+          reference_id?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_earnings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_earnings_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           created_at: string
@@ -134,8 +179,47 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          kind: string
+          read: boolean
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          read?: boolean
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          read?: boolean
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          agent_code: string | null
           created_at: string
           farmer_specialty:
             | Database["public"]["Enums"]["farmer_specialty"]
@@ -147,10 +231,15 @@ export type Database = {
           location_lng: number | null
           phone: string | null
           pro_since: string | null
+          referred_by_agent: string | null
           subscription_tier: Database["public"]["Enums"]["subscription_tier"]
           updated_at: string
+          verification_notes: string | null
+          verification_status: string
+          verified: boolean
         }
         Insert: {
+          agent_code?: string | null
           created_at?: string
           farmer_specialty?:
             | Database["public"]["Enums"]["farmer_specialty"]
@@ -162,10 +251,15 @@ export type Database = {
           location_lng?: number | null
           phone?: string | null
           pro_since?: string | null
+          referred_by_agent?: string | null
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
+          verification_notes?: string | null
+          verification_status?: string
+          verified?: boolean
         }
         Update: {
+          agent_code?: string | null
           created_at?: string
           farmer_specialty?:
             | Database["public"]["Enums"]["farmer_specialty"]
@@ -177,10 +271,22 @@ export type Database = {
           location_lng?: number | null
           phone?: string | null
           pro_since?: string | null
+          referred_by_agent?: string | null
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
+          verification_notes?: string | null
+          verification_status?: string
+          verified?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_referred_by_agent_fkey"
+            columns: ["referred_by_agent"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -203,11 +309,54 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_documents: {
+        Row: {
+          created_at: string
+          doc_type: string
+          file_url: string
+          id: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          doc_type: string
+          file_url: string
+          id?: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          doc_type?: string
+          file_url?: string
+          id?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_documents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      find_agent_by_code: {
+        Args: { _code: string }
+        Returns: {
+          agent_id: string
+          agent_name: string
+        }[]
+      }
+      generate_agent_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
