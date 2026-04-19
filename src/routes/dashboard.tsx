@@ -147,6 +147,7 @@ interface ExpertCard {
   verified: boolean;
   location_lat: number | null;
   location_lng: number | null;
+  tier: SubscriptionTier;
   km?: number;
 }
 
@@ -162,7 +163,7 @@ function FarmerView({ profile }: { profile: Profile | null }) {
       supabase
         .from("expert_profiles")
         .select(
-          "id, specialty, rating, hourly_rate, years_experience, verified, profiles!expert_profiles_id_fkey(full_name, location_lat, location_lng)",
+          "id, specialty, rating, hourly_rate, years_experience, verified, profiles!expert_profiles_id_fkey(full_name, location_lat, location_lng, subscription_tier)",
         ),
       supabase
         .from("bookings")
@@ -180,6 +181,7 @@ function FarmerView({ profile }: { profile: Profile | null }) {
         verified: row.verified,
         location_lat: row.profiles?.location_lat ?? null,
         location_lng: row.profiles?.location_lng ?? null,
+        tier: (row.profiles?.subscription_tier as SubscriptionTier) ?? "free",
       };
       if (
         profile?.location_lat &&
@@ -194,7 +196,13 @@ function FarmerView({ profile }: { profile: Profile | null }) {
       }
       return card;
     });
-    list.sort((a, b) => (a.km ?? 9999) - (b.km ?? 9999));
+    // Pro experts always first, then by distance
+    list.sort((a, b) => {
+      const ap = a.tier === "pro" ? 1 : 0;
+      const bp = b.tier === "pro" ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      return (a.km ?? 9999) - (b.km ?? 9999);
+    });
     setExperts(list);
     setBookings((bk as any) ?? []);
     setLoading(false);
