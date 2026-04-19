@@ -323,7 +323,13 @@ function BookingList({
   mode: "farmer" | "expert";
   onChange: () => void;
 }) {
-  const update = async (id: string, patch: Partial<BookingRow>) => {
+  const update = async (
+    id: string,
+    patch: {
+      status?: BookingRow["status"];
+      payment_status?: BookingRow["payment_status"];
+    },
+  ) => {
     const { error } = await supabase.from("bookings").update(patch).eq("id", id);
     if (error) toast.error(error.message);
     else {
