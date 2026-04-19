@@ -1,4 +1,4 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link } from "@tanstack/react-router";
 import { Sprout, Crown, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut, type AppRole } from "@/lib/auth";
@@ -37,19 +37,19 @@ export function AppHeader({ role, email, tier, userId }: Props) {
         {email && (
           <nav className="hidden items-center gap-1 md:flex">
             <Button asChild variant="ghost" size="sm">
-              <NavLink to="/dashboard" className={({ isActive }) => isActive ? "bg-secondary" : ""}>Dashboard</NavLink>
+              <Link to="/dashboard" activeProps={{ className: "bg-secondary" }}>Dashboard</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <NavLink to="/marketplace" className={({ isActive }) => isActive ? "bg-secondary" : ""}>Marketplace</NavLink>
+              <Link to="/marketplace" activeProps={{ className: "bg-secondary" }}>Marketplace</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <NavLink to="/pricing" className={({ isActive }) => isActive ? "bg-secondary" : ""}>Pricing</NavLink>
+              <Link to="/pricing" activeProps={{ className: "bg-secondary" }}>Pricing</Link>
             </Button>
             {role === "admin" && (
               <Button asChild variant="ghost" size="sm">
-                <NavLink to="/admin" className={({ isActive }) => isActive ? "bg-secondary" : ""}>
+                <Link to="/admin" activeProps={{ className: "bg-secondary" }}>
                   <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Admin
-                </NavLink>
+                </Link>
               </Button>
             )}
           </nav>

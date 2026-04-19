@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck, FileText, CheckCircle2, XCircle, Users, Store, UserCog, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,7 +73,7 @@ export default function Admin() {
     (async () => {
       const { user, role } = await getCurrentUserAndRole();
       if (!user) {
-        navigate("/auth");
+        navigate({ to: "/auth" });
         return;
       }
       // Also accept admin role if it exists in the user's role set
@@ -81,7 +81,7 @@ export default function Admin() {
       const isAdmin = (allRoles ?? []).some((r) => r.role === "admin") || role === "admin";
       if (!isAdmin) {
         toast.error("Admin access required");
-        navigate("/dashboard");
+        navigate({ to: "/dashboard" });
         return;
       }
       setEmail(user.email ?? null);

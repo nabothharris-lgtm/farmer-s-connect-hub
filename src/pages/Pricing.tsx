@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Check, Sparkles, Loader2, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";

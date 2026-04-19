@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2, Crown, Package, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,7 +72,7 @@ export default function Marketplace() {
     (async () => {
       const { user, role } = await getCurrentUserAndRole();
       if (!user) {
-        navigate("/auth");
+        navigate({ to: "/auth" });
         return;
       }
       setRole(role);
