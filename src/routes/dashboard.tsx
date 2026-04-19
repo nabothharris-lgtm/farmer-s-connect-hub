@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, MapPin, Calendar, Star, Users, Store, Wallet, ArrowRight } from "lucide-react";
+import { Loader2, MapPin, Calendar, Star, Users, Store, Wallet, ArrowRight, Crown, Sparkles, Package, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUserAndRole, type AppRole, distanceKm } from "@/lib/auth";
+import { shouldShowProUpsell, type SubscriptionTier, TRIAL_DAYS } from "@/lib/subscription";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,10 @@ interface Profile {
   full_name: string | null;
   location_lat: number | null;
   location_lng: number | null;
+  subscription_tier: SubscriptionTier;
+  pro_since: string | null;
+  created_at: string;
+  farmer_specialty: string | null;
 }
 
 function DashboardPage() {
@@ -41,10 +46,10 @@ function DashboardPage() {
       setRole(role);
       const { data: prof } = await supabase
         .from("profiles")
-        .select("id, full_name, location_lat, location_lng")
+        .select("id, full_name, location_lat, location_lng, subscription_tier, pro_since, created_at, farmer_specialty")
         .eq("id", user.id)
         .maybeSingle();
-      setProfile(prof);
+      setProfile(prof as Profile | null);
       setLoading(false);
     })();
   }, [navigate]);
@@ -59,20 +64,29 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader role={role} email={email} />
+      <AppHeader role={role} email={email} tier={profile?.subscription_tier} />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            Karibu, {profile?.full_name || "friend"} 👋
-          </h1>
-          <p className="text-muted-foreground">
-            {role === "farmer" && "Find experts, book services, and grow your farm."}
-            {role === "expert" && "Manage incoming bookings and your profile."}
-            {role === "store" && "Manage your products and incoming orders (coming soon)."}
-            {role === "agent" && "Onboard farmers and earn commission (coming soon)."}
-            {!role && "Your role isn't set yet."}
-          </p>
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+              Karibu, {profile?.full_name || "friend"} 👋
+            </h1>
+            <p className="text-muted-foreground">
+              {role === "farmer" && "Find experts, list produce, and grow your farm."}
+              {role === "expert" && "Manage incoming bookings and your profile."}
+              {role === "store" && "Manage your products and incoming orders (coming soon)."}
+              {role === "agent" && "Onboard farmers and earn commission (coming soon)."}
+              {!role && "Your role isn't set yet."}
+            </p>
+          </div>
+          {profile?.subscription_tier === "pro" && (
+            <Badge className="bg-primary text-primary-foreground">
+              <Crown className="mr-1 h-3 w-3" /> Pro member
+            </Badge>
+          )}
         </div>
+
+        <ProUpsellBanner profile={profile} />
 
         {role === "farmer" && <FarmerView profile={profile} />}
         {role === "expert" && <ExpertView />}
@@ -80,6 +94,44 @@ function DashboardPage() {
         {role === "agent" && <ComingSoonView icon={Users} title="Agent dashboard" />}
       </main>
     </div>
+  );
+}
+
+/* ========== PRO UPSELL ========== */
+
+function ProUpsellBanner({ profile }: { profile: Profile | null }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed || !profile) return null;
+  if (!shouldShowProUpsell(profile)) return null;
+
+  return (
+    <Card className="relative mb-6 overflow-hidden border-primary/40 p-5">
+      <div
+        className="pointer-events-none absolute inset-0 -z-0 opacity-40"
+        style={{ background: "radial-gradient(60% 80% at 100% 0%, var(--primary-glow) 0%, transparent 60%)" }}
+      />
+      <button onClick={() => setDismissed(true)} className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:bg-muted">
+        <X className="h-4 w-4" />
+      </button>
+      <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="font-semibold">You've been on Free for {TRIAL_DAYS}+ days — ready for Pro?</div>
+            <p className="text-sm text-muted-foreground">
+              Get promoted placement, marketplace ads, and a verified Pro badge.
+            </p>
+          </div>
+        </div>
+        <Button asChild>
+          <Link to="/pricing">
+            <Crown className="mr-1 h-4 w-4" /> See Pro plan
+          </Link>
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -95,6 +147,7 @@ interface ExpertCard {
   verified: boolean;
   location_lat: number | null;
   location_lng: number | null;
+  tier: SubscriptionTier;
   km?: number;
 }
 
@@ -110,7 +163,7 @@ function FarmerView({ profile }: { profile: Profile | null }) {
       supabase
         .from("expert_profiles")
         .select(
-          "id, specialty, rating, hourly_rate, years_experience, verified, profiles!expert_profiles_id_fkey(full_name, location_lat, location_lng)",
+          "id, specialty, rating, hourly_rate, years_experience, verified, profiles!expert_profiles_id_fkey(full_name, location_lat, location_lng, subscription_tier)",
         ),
       supabase
         .from("bookings")
@@ -128,6 +181,7 @@ function FarmerView({ profile }: { profile: Profile | null }) {
         verified: row.verified,
         location_lat: row.profiles?.location_lat ?? null,
         location_lng: row.profiles?.location_lng ?? null,
+        tier: (row.profiles?.subscription_tier as SubscriptionTier) ?? "free",
       };
       if (
         profile?.location_lat &&
@@ -142,7 +196,13 @@ function FarmerView({ profile }: { profile: Profile | null }) {
       }
       return card;
     });
-    list.sort((a, b) => (a.km ?? 9999) - (b.km ?? 9999));
+    // Pro experts always first, then by distance
+    list.sort((a, b) => {
+      const ap = a.tier === "pro" ? 1 : 0;
+      const bp = b.tier === "pro" ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      return (a.km ?? 9999) - (b.km ?? 9999);
+    });
     setExperts(list);
     setBookings((bk as any) ?? []);
     setLoading(false);
@@ -194,7 +254,12 @@ function FarmerView({ profile }: { profile: Profile | null }) {
             <Card className="p-5 text-sm text-muted-foreground">No experts yet.</Card>
           )}
           {experts.map((e) => (
-            <Card key={e.id} className="p-4">
+            <Card key={e.id} className={`relative p-4 ${e.tier === "pro" ? "border-primary/40 ring-1 ring-primary/20" : ""}`}>
+              {e.tier === "pro" && (
+                <Badge className="absolute right-3 top-3 bg-primary text-primary-foreground text-[10px]">
+                  <Sparkles className="mr-0.5 h-2.5 w-2.5" /> Sponsored
+                </Badge>
+              )}
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
                   {(e.full_name ?? "E")[0]}
@@ -223,9 +288,32 @@ function FarmerView({ profile }: { profile: Profile | null }) {
         </div>
       </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">My bookings</h2>
-        <BookingList rows={bookings} mode="farmer" onChange={load} />
+      <section className="space-y-4">
+        <Card className="bg-primary/5 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <Package className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold">Farmer Marketplace</div>
+              <p className="text-xs text-muted-foreground">
+                {profile?.farmer_specialty
+                  ? `Sell your ${profile.farmer_specialty} produce — buyers can find you.`
+                  : "Browse produce or list your own."}
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" className="mt-3 w-full">
+            <Link to="/marketplace">
+              Open marketplace <ArrowRight className="ml-1 h-3 w-3" />
+            </Link>
+          </Button>
+        </Card>
+
+        <div>
+          <h2 className="mb-3 text-lg font-semibold">My bookings</h2>
+          <BookingList rows={bookings} mode="farmer" onChange={load} />
+        </div>
       </section>
     </div>
   );
