@@ -46,10 +46,10 @@ function DashboardPage() {
       setRole(role);
       const { data: prof } = await supabase
         .from("profiles")
-        .select("id, full_name, location_lat, location_lng")
+        .select("id, full_name, location_lat, location_lng, subscription_tier, pro_since, created_at, farmer_specialty")
         .eq("id", user.id)
         .maybeSingle();
-      setProfile(prof);
+      setProfile(prof as Profile | null);
       setLoading(false);
     })();
   }, [navigate]);
