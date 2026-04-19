@@ -14,9 +14,16 @@ export async function getCurrentUserAndRole(): Promise<{
     .from("user_roles")
     .select("role")
     .eq("user_id", user.id)
+    .order("role", { ascending: true })
     .limit(1)
     .maybeSingle();
   return { user, role: (roles?.role as AppRole | undefined) ?? null };
+}
+
+/** Gets ALL roles for a user (someone could be both 'farmer' and 'admin'). */
+export async function getAllRoles(userId: string): Promise<AppRole[]> {
+  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  return (data ?? []).map((r) => r.role as AppRole);
 }
 
 export async function signOut() {
