@@ -53,8 +53,8 @@ function Landing() {
       <header className="border-b border-border/60">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Sprout className="h-5 w-5" />
+            <div className="flex h-10 w-10 overflow-hidden rounded-lg bg-white/10 p-1">
+              <img src="/favicon.ico" alt="AgriConnect Logo" className="h-full w-full object-contain" />
             </div>
             <div>
               <div className="font-semibold leading-none tracking-tight">AgriConnect</div>
