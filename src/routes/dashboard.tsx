@@ -288,9 +288,32 @@ function FarmerView({ profile }: { profile: Profile | null }) {
         </div>
       </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">My bookings</h2>
-        <BookingList rows={bookings} mode="farmer" onChange={load} />
+      <section className="space-y-4">
+        <Card className="bg-primary/5 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <Package className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold">Farmer Marketplace</div>
+              <p className="text-xs text-muted-foreground">
+                {profile?.farmer_specialty
+                  ? `Sell your ${profile.farmer_specialty} produce — buyers can find you.`
+                  : "Browse produce or list your own."}
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" className="mt-3 w-full">
+            <Link to="/marketplace">
+              Open marketplace <ArrowRight className="ml-1 h-3 w-3" />
+            </Link>
+          </Button>
+        </Card>
+
+        <div>
+          <h2 className="mb-3 text-lg font-semibold">My bookings</h2>
+          <BookingList rows={bookings} mode="farmer" onChange={load} />
+        </div>
       </section>
     </div>
   );
