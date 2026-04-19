@@ -89,35 +89,95 @@ export type Database = {
         }
         Relationships: []
       }
+      farmer_products: {
+        Row: {
+          category: Database["public"]["Enums"]["farmer_specialty"]
+          created_at: string
+          description: string | null
+          farmer_id: string
+          id: string
+          image_url: string | null
+          is_active: boolean
+          price: number
+          quantity_available: number
+          title: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["farmer_specialty"]
+          created_at?: string
+          description?: string | null
+          farmer_id: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          price?: number
+          quantity_available?: number
+          title: string
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["farmer_specialty"]
+          created_at?: string
+          description?: string | null
+          farmer_id?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          price?: number
+          quantity_available?: number
+          title?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
+          farmer_specialty:
+            | Database["public"]["Enums"]["farmer_specialty"]
+            | null
           full_name: string | null
           id: string
           location_label: string | null
           location_lat: number | null
           location_lng: number | null
           phone: string | null
+          pro_since: string | null
+          subscription_tier: Database["public"]["Enums"]["subscription_tier"]
           updated_at: string
         }
         Insert: {
           created_at?: string
+          farmer_specialty?:
+            | Database["public"]["Enums"]["farmer_specialty"]
+            | null
           full_name?: string | null
           id: string
           location_label?: string | null
           location_lat?: number | null
           location_lng?: number | null
           phone?: string | null
+          pro_since?: string | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
         }
         Update: {
           created_at?: string
+          farmer_specialty?:
+            | Database["public"]["Enums"]["farmer_specialty"]
+            | null
           full_name?: string | null
           id?: string
           location_label?: string | null
           location_lat?: number | null
           location_lng?: number | null
           phone?: string | null
+          pro_since?: string | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
         }
         Relationships: []
@@ -159,7 +219,15 @@ export type Database = {
     Enums: {
       app_role: "farmer" | "expert" | "store" | "agent" | "admin"
       booking_status: "pending" | "accepted" | "completed" | "cancelled"
+      farmer_specialty:
+        | "poultry"
+        | "crops"
+        | "dairy"
+        | "fish"
+        | "mixed"
+        | "other"
       payment_status: "pending" | "paid" | "released"
+      subscription_tier: "free" | "pro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -289,7 +357,9 @@ export const Constants = {
     Enums: {
       app_role: ["farmer", "expert", "store", "agent", "admin"],
       booking_status: ["pending", "accepted", "completed", "cancelled"],
+      farmer_specialty: ["poultry", "crops", "dairy", "fish", "mixed", "other"],
       payment_status: ["pending", "paid", "released"],
+      subscription_tier: ["free", "pro"],
     },
   },
 } as const
