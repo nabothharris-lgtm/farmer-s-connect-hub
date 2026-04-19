@@ -29,14 +29,18 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Agriconnect" },
+      { name: "description", content: "This is agriconnect" },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Agriconnect" },
+      { property: "og:description", content: "This is agriconnect" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Agriconnect" },
+      { name: "twitter:description", content: "This is agriconnect" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/6XjYJ0gnsKYQr0AZnYg8f1sUmsx2/social-images/social-1776595765328-favicon.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/6XjYJ0gnsKYQr0AZnYg8f1sUmsx2/social-images/social-1776595765328-favicon.webp" },
     ],
     links: [
       {
