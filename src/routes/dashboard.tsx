@@ -64,20 +64,29 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader role={role} email={email} />
+      <AppHeader role={role} email={email} tier={profile?.subscription_tier} />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            Karibu, {profile?.full_name || "friend"} 👋
-          </h1>
-          <p className="text-muted-foreground">
-            {role === "farmer" && "Find experts, book services, and grow your farm."}
-            {role === "expert" && "Manage incoming bookings and your profile."}
-            {role === "store" && "Manage your products and incoming orders (coming soon)."}
-            {role === "agent" && "Onboard farmers and earn commission (coming soon)."}
-            {!role && "Your role isn't set yet."}
-          </p>
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+              Karibu, {profile?.full_name || "friend"} 👋
+            </h1>
+            <p className="text-muted-foreground">
+              {role === "farmer" && "Find experts, list produce, and grow your farm."}
+              {role === "expert" && "Manage incoming bookings and your profile."}
+              {role === "store" && "Manage your products and incoming orders (coming soon)."}
+              {role === "agent" && "Onboard farmers and earn commission (coming soon)."}
+              {!role && "Your role isn't set yet."}
+            </p>
+          </div>
+          {profile?.subscription_tier === "pro" && (
+            <Badge className="bg-primary text-primary-foreground">
+              <Crown className="mr-1 h-3 w-3" /> Pro member
+            </Badge>
+          )}
         </div>
+
+        <ProUpsellBanner profile={profile} />
 
         {role === "farmer" && <FarmerView profile={profile} />}
         {role === "expert" && <ExpertView />}
@@ -85,6 +94,44 @@ function DashboardPage() {
         {role === "agent" && <ComingSoonView icon={Users} title="Agent dashboard" />}
       </main>
     </div>
+  );
+}
+
+/* ========== PRO UPSELL ========== */
+
+function ProUpsellBanner({ profile }: { profile: Profile | null }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed || !profile) return null;
+  if (!shouldShowProUpsell(profile)) return null;
+
+  return (
+    <Card className="relative mb-6 overflow-hidden border-primary/40 p-5">
+      <div
+        className="pointer-events-none absolute inset-0 -z-0 opacity-40"
+        style={{ background: "radial-gradient(60% 80% at 100% 0%, var(--primary-glow) 0%, transparent 60%)" }}
+      />
+      <button onClick={() => setDismissed(true)} className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:bg-muted">
+        <X className="h-4 w-4" />
+      </button>
+      <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="font-semibold">You've been on Free for {TRIAL_DAYS}+ days — ready for Pro?</div>
+            <p className="text-sm text-muted-foreground">
+              Get promoted placement, marketplace ads, and a verified Pro badge.
+            </p>
+          </div>
+        </div>
+        <Button asChild>
+          <Link to="/pricing">
+            <Crown className="mr-1 h-4 w-4" /> See Pro plan
+          </Link>
+        </Button>
+      </div>
+    </Card>
   );
 }
 
