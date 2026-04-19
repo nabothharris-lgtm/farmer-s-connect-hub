@@ -554,3 +554,175 @@ function ComingSoonView({ icon: Icon, title }: { icon: any; title: string }) {
     </Card>
   );
 }
+
+/* ========== AGENT ========== */
+
+interface AgentEarning {
+  id: string;
+  source: string;
+  amount: number;
+  created_at: string;
+  farmer_id: string;
+}
+
+interface LeaderRow {
+  agent_id: string;
+  total: number;
+  count: number;
+  name: string | null;
+  agent_code: string | null;
+}
+
+function AgentView({ profile }: { profile: Profile }) {
+  const [earnings, setEarnings] = useState<AgentEarning[]>([]);
+  const [referrals, setReferrals] = useState<{ id: string; full_name: string | null; created_at: string }[]>([]);
+  const [leaders, setLeaders] = useState<LeaderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    const [{ data: e }, { data: r }, { data: allEarn }, { data: profs }] = await Promise.all([
+      supabase.from("agent_earnings").select("id, source, amount, created_at, farmer_id").eq("agent_id", profile.id).order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, full_name, created_at").eq("referred_by_agent", profile.id).order("created_at", { ascending: false }),
+      supabase.from("agent_earnings").select("agent_id, amount"),
+      supabase.from("profiles").select("id, full_name, agent_code").not("agent_code", "is", null),
+    ]);
+    setEarnings((e as AgentEarning[]) ?? []);
+    setReferrals((r as { id: string; full_name: string | null; created_at: string }[]) ?? []);
+
+    // Build leaderboard
+    const totals = new Map<string, { total: number; count: number }>();
+    (allEarn ?? []).forEach((row) => {
+      const cur = totals.get(row.agent_id) ?? { total: 0, count: 0 };
+      cur.total += Number(row.amount);
+      cur.count += 1;
+      totals.set(row.agent_id, cur);
+    });
+    const profMap = new Map((profs ?? []).map((p) => [p.id, p]));
+    const board: LeaderRow[] = [...totals.entries()]
+      .map(([agent_id, t]) => ({
+        agent_id,
+        total: t.total,
+        count: t.count,
+        name: profMap.get(agent_id)?.full_name ?? "Agent",
+        agent_code: profMap.get(agent_id)?.agent_code ?? null,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+    setLeaders(board);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.id]);
+
+  const totalEarned = earnings.reduce((sum, e) => sum + Number(e.amount), 0);
+  const myRank = leaders.findIndex((l) => l.agent_id === profile.id) + 1;
+
+  const copyCode = () => {
+    if (!profile.agent_code) return;
+    navigator.clipboard.writeText(profile.agent_code);
+    toast.success("Agent ID copied");
+  };
+
+  if (loading) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
+
+  return (
+    <div className="space-y-6">
+      {/* Agent ID card */}
+      <Card className="relative overflow-hidden p-5">
+        <div
+          className="pointer-events-none absolute inset-0 -z-0 opacity-30"
+          style={{ background: "radial-gradient(60% 80% at 100% 0%, var(--primary-glow) 0%, transparent 60%)" }}
+        />
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Your Agent ID</div>
+            <div className="font-mono text-3xl font-bold tracking-tight">{profile.agent_code ?? "—"}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Share with farmers to earn commission on every transaction.</p>
+          </div>
+          <Button onClick={copyCode} variant="outline" size="sm">
+            <Copy className="mr-1 h-3 w-3" /> Copy ID
+          </Button>
+        </div>
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Stat label="Total earned (UGX)" value={totalEarned.toLocaleString()} icon={Wallet} />
+        <Stat label="Transactions" value={earnings.length} icon={ArrowRight} />
+        <Stat label="Farmers referred" value={referrals.length} icon={Users} />
+        <Stat label="Leaderboard rank" value={myRank > 0 ? `#${myRank}` : "—"} icon={Trophy} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section>
+          <h2 className="mb-3 text-lg font-semibold flex items-center gap-2"><Trophy className="h-5 w-5 text-accent" /> Top agents</h2>
+          {leaders.length === 0 ? (
+            <Card className="p-5 text-sm text-muted-foreground">No earnings recorded yet.</Card>
+          ) : (
+            <Card className="divide-y divide-border">
+              {leaders.map((l, i) => {
+                const isMe = l.agent_id === profile.id;
+                return (
+                  <div key={l.agent_id} className={`flex items-center justify-between p-3 ${isMe ? "bg-primary/5" : ""}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                        i === 0 ? "bg-yellow-400/20 text-yellow-700 dark:text-yellow-400" :
+                        i === 1 ? "bg-zinc-300/30 text-zinc-700 dark:text-zinc-200" :
+                        i === 2 ? "bg-orange-400/20 text-orange-700 dark:text-orange-400" :
+                        "bg-muted text-muted-foreground"
+                      }`}>{i + 1}</div>
+                      <div>
+                        <div className="text-sm font-semibold">{l.name} {isMe && <span className="text-xs text-primary">(you)</span>}</div>
+                        <div className="text-[11px] font-mono text-muted-foreground">{l.agent_code}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-semibold">UGX {l.total.toLocaleString()}</div>
+                      <div className="text-[11px] text-muted-foreground">{l.count} txn</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Recent earnings</h2>
+          {earnings.length === 0 ? (
+            <Card className="p-5 text-sm text-muted-foreground">No earnings yet. Share your Agent ID with farmers to start earning.</Card>
+          ) : (
+            <Card className="divide-y divide-border">
+              {earnings.slice(0, 8).map((e) => (
+                <div key={e.id} className="flex items-center justify-between p-3 text-sm">
+                  <div>
+                    <div className="font-medium capitalize">{e.source} commission</div>
+                    <div className="text-[11px] text-muted-foreground">{new Date(e.created_at).toLocaleString()}</div>
+                  </div>
+                  <div className="font-semibold text-primary">+ UGX {Number(e.amount).toLocaleString()}</div>
+                </div>
+              ))}
+            </Card>
+          )}
+
+          <h2 className="mb-3 mt-6 text-lg font-semibold">My farmers</h2>
+          {referrals.length === 0 ? (
+            <Card className="p-5 text-sm text-muted-foreground">No referred farmers yet.</Card>
+          ) : (
+            <Card className="divide-y divide-border">
+              {referrals.map((r) => (
+                <div key={r.id} className="flex items-center justify-between p-3 text-sm">
+                  <div className="font-medium">{r.full_name ?? "Farmer"}</div>
+                  <div className="text-[11px] text-muted-foreground">Joined {new Date(r.created_at).toLocaleDateString()}</div>
+                </div>
+              ))}
+            </Card>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
